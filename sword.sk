@@ -1,0 +1,65 @@
+# 1. 攻撃時の処理（基本ダメージ30 + 安全な雷の演出）
+on damage of an entity:
+    if attacker is a player:
+        if name of attacker's tool is "&8&kAA&e&l雷鳴&4&lの剣&8&kAA":
+            strike lightning effect at victim
+            set damage to 30
+
+# 2. 剣を持って右クリックした時の処理（15ブロック先へTP + 絶対めり込み防止・壁手前停止）
+on right click:
+    if name of player's tool is "&8&kAA&e&l雷鳴&4&lの剣&8&kAA":
+        # クールダウンのチェック
+        if {raimei.cd::%player%} is set:
+            if difference between {raimei.cd::%player%} and now is less than 20 seconds:
+                set {_left} to difference between 20 seconds and (difference between {raimei.cd::%player%} and now)
+                message "&cクールダウン中です。あと %{_left}% 待ってください。" to player
+                cancel event
+                stop
+            
+        # プレイヤーの今の位置を初期の目的地にしておく
+        set {_target} to player's location
+        
+        # 1マス目から15マス目まで、1歩ずつ安全性を確認しながら前進させる
+        loop 15 times:
+            # 自分のすぐ近く（最初の2ブロック）は足元や手前のブロックに引っかからないようスルーし、3ブロック目以降から厳しく判定する
+            if loop-value is greater than 2:
+                # チェック用の座標（足元の高さ ＆ 上半身の高さ）
+                set {_checkBody} to location loop-value blocks in front of player's location
+                set {_checkEye} to location loop-value blocks in front of player's eye location
+                
+                set {_wallHit} to false
+                
+                # 下半身または上半身に「壁（空気でも水でもないブロック）」があるかチェック
+                if block at {_checkBody} is not air:
+                    if block at {_checkBody} is not water:
+                        set {_wallHit} to true
+                        
+                if block at {_checkEye} is not air:
+                    if block at {_checkEye} is not water:
+                        set {_wallHit} to true
+                
+                # 壁にぶつかっていたら、これ以上進めないのでループをストップする（手前の安全な位置が {_target} として残る）
+                if {_wallHit} is true:
+                    stop loop
+            
+            # 壁にぶつかっていない安全な空間であれば、目的地をその1歩先の位置に更新していく
+            set {_target} to location loop-value blocks in front of player's location
+            set y-coordinate of {_target} to y-coordinate of player
+
+        # プレイヤーの視線（向き）を維持させる
+        set yaw of {_target} to yaw of player
+        set pitch of {_target} to pitch of player
+        
+        # テレポート実行
+        teleport player to {_target}
+        play sound "entity.endermen.teleport" with volume 1 with pitch 1 at player
+        
+        # クールダウンの開始時間を記録
+        set {raimei.cd::%player%} to now
+
+# 3. 剣を手に入れるためのコマンド
+command /givesword:
+    permission: op
+    trigger:
+        give 1 of diamond sword named "&8&kAA&e&l雷鳴&4&lの剣&8&kAA" with lore "&7&l●Left click", "  &7Attack damage 30", "", "&7&l●Right click.", "  &7Teleport 15 blocks", "" to player
+        message "&a雷鳴の剣 を付与しました。"
